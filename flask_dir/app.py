@@ -2,7 +2,6 @@ from flask import Flask, Blueprint, request, jsonify, make_response, Response
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import func, and_
 from os import environ
-from countries import countries
 import datetime
 
 app = Flask(__name__)
