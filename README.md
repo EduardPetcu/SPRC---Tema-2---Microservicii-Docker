@@ -22,4 +22,5 @@ interactiunea python flask-ului cu bazele de date
 
 # Referinte
 [1] : https://github.com/pgadmin-org/pgadmin4
+
 [2] : https://www.youtube.com/watch?v=fHQWTsWqBdE&t
