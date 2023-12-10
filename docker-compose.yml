@@ -1,0 +1,40 @@
+version: "3.9"
+
+services:
+  flask_app:
+    container_name: flask_app
+    image: weather-server
+    build: ./flask_dir
+    ports:
+      - "4000:4000"
+    environment:
+      - DB_URL=postgresql://postgres:postgres@flask_db:5432/postgres
+    depends_on:
+      - flask_db
+      
+  flask_db:
+    container_name: flask_db
+    image: postgres:12
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_DB=postgres
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  pgadmin:
+    container_name: pgadmin
+    image: dpage/pgadmin4
+    ports:
+      - "5050:80"
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=admin@example.com
+      - PGADMIN_DEFAULT_PASSWORD=admin
+      - PGADMIN_LISTEN_PORT=80
+    depends_on:
+      - flask_db
+
+volumes:
+  pgdata: {}
