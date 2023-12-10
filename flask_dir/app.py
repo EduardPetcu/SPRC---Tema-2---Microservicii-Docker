@@ -9,6 +9,12 @@ app.config['SQLALCHEMY_DATABASE_URI'] = environ.get('DB_URL')
 db = SQLAlchemy(app)
 payload_country_keys = ['id', 'nume', 'lat', 'lon']
 payload_city_keys = ['id', 'nume', 'lat', 'lon', 'idTara']
+
+'''
+Tari reprezinta schema tabelului Tari din baza de date
+Am folosit autoincrement pentru id, iar pentru nume am folosit unique=True
+De asemenea, am folosit cascade="all,delete" pentru a sterge si orasele din tara respectiva
+'''
 class Tari(db.Model):
     __tablename__ = 'Tari'
 
@@ -16,10 +22,16 @@ class Tari(db.Model):
     nume = db.Column(db.String(100), nullable=False, unique=True)
     lat = db.Column(db.Float, nullable=False)
     lon = db.Column(db.Float, nullable=False)
-    orase = db.relationship('Orase', cascade="all,delete", backref='tara')
+    orase = db.relationship('Orase', cascade="all,delete")
     def json(self):
         return {"id": self.id, "nume": self.nume, "lat": self.lat, "lon": self.lon}
 
+'''
+Orase reprezinta schema tabelului Orase din baza de date
+Am folosit autoincrement pentru id, iar pentru constrangerea de unicitate am 
+folosit UniqueConstraint intre idTara si nume De asemenea, am folosit 
+cascade="all,delete" pentru a sterge si temperaturile din orasul respectiv
+'''
 class Orase(db.Model):
     __tablename__ = 'Orase'
 
@@ -28,12 +40,21 @@ class Orase(db.Model):
     nume = db.Column(db.String(100), nullable=False)
     lat = db.Column(db.Float, nullable=False)
     lon = db.Column(db.Float, nullable=False)
-    temp = db.relationship('Temperaturi', cascade="all,delete", backref='oras')
+    temp = db.relationship('Temperaturi', cascade="all,delete")
     __table_args__ = (db.UniqueConstraint('idTara', 'nume', name='unique_tara_nume'),)
 
     def json(self):
         return {"id": self.id, "nume": self.nume, "lat": self.lat, "lon": self.lon, "idTara": self.idTara}
     
+'''
+Temperaturi reprezinta schema tabelului Temperaturi din baza de date
+Am folosit autoincrement pentru id, iar pentru constrangerea de unicitate 
+am folosit UniqueConstraint. 
+Timestamp este de tip DateTime si se pune automat prin flag-ul default=func.now()
+func reprezentand o functie din sqlalchemy care returneaza data curenta cu 
+precizie de 1 microsecunda Afisarea temperaturii se face in formatul YYYY-MM-DD 
+prin functia strftime din datetime
+'''
 class Temperaturi(db.Model):
     __tablename__ = 'Temperaturi'
 
@@ -45,7 +66,10 @@ class Temperaturi(db.Model):
 
     def json(self):
         return {"id": self.id, "valoare": self.valoare, "timestamp": self.timestamp.strftime("%Y-%m-%d")}
-    
+
+'''
+Returneaza o lista pe baza filtrelor date ca parametrii
+'''
 def get_filters(lat, lon, from_date, until_date):
     filter_list = []
     if lat is not None:
@@ -64,31 +88,38 @@ def get_filters(lat, lon, from_date, until_date):
         filter_list.append(Temperaturi.timestamp<=until_date)
     return filter_list
 
+# creaza tabelele in baza de date
 db.create_all()
+
 @app.route("/api/countries", methods=['POST'])
 def create_country():
     try: 
         payload = request.get_json(silent=True)
+        # verificam daca campurile exista
         for key in payload_country_keys:
             if key not in payload and key != 'id':
                 return make_response(jsonify({'error': 'Campuri invalide!'}), 400)
+        # verificam daca campurile sunt de tipul asteptat
         if not(
             isinstance(payload['lat'], (int, float)) and 
             isinstance(payload['lon'], (int, float)) and 
             type(payload['nume']) is str
         ):
             return make_response(jsonify({'error': 'Campurile nu respecta formatul admis'}), 400)
+        # convertim lat si lon la float in cazul in care sunt int
         lat_country = float(payload['lat'])
         lon_country = float(payload['lon'])
+        # verificam daca tara exista deja
         countries = Tari.query.filter_by(nume=payload['nume'])
         if countries.count() > 0:
             return make_response(jsonify({'error': 'Tara exista deja!'}), 409)
+        # cream tara
         new_country = Tari(nume=payload['nume'], lat=lat_country, lon=lon_country)
         db.session.add(new_country)
         db.session.commit()
         return make_response(jsonify({'id': new_country.id}), 201)
     except:
-        return make_response(jsonify({'error': 'eroare la crearea tarii'}), 500)
+        return make_response(jsonify({'error': 'Eroare la crearea tarii'}), 500)
     
 @app.route("/api/countries", methods=['GET'])
 def get_countries():
@@ -96,18 +127,19 @@ def get_countries():
         countries = Tari.query.all()
         return make_response(jsonify([country.json() for country in countries]), 200)
     except:
-        return make_response(jsonify({'error': 'eroare la preluarea tarilor'}), 500)
+        return make_response(jsonify({'error': 'Eroare la preluarea tarilor'}), 500)
 
-# eroarea 400 e tratata by default
 @app.route("/api/countries/<int:id>", methods=['PUT'])
 def update_country(id):
     try:
         country = Tari.query.filter_by(id=id).first()
         if country: 
             payload = request.get_json(silent=True)
+            # verificam daca campurile exista
             for key in payload_country_keys:
                 if key not in payload:
                     return make_response(jsonify({'error': 'Campuri invalide'}), 400)
+            # verificam daca campurile sunt de tipul asteptat
             if not (
                 isinstance(payload['lat'], (int, float)) and 
                 isinstance(payload['lon'], (int, float)) and 
@@ -116,16 +148,17 @@ def update_country(id):
                 return make_response(jsonify({'error': 'Campurile nu respecta formatul admis'}), 400)
             payload['lat'] = float(payload['lat'])
             payload['lon'] = float(payload['lon'])
+            # verificam daca tara exista deja
             countries = Tari.query.filter_by(nume=payload['nume'])
             if countries.count() > 0:
                 return make_response(jsonify({'error': 'Tara exista deja'}), 409)
             for key in payload_country_keys:
                 setattr(country, key, payload[key])
             db.session.commit()
-            return make_response(jsonify({'message': 'Country updated'}), 200)
-        return make_response(jsonify({'error': 'Country not found'}), 404)
+            return make_response(jsonify({'message': 'Tara a fost actualizata'}), 200)
+        return make_response(jsonify({'error': 'Tara nu a fost gasita'}), 404)
     except:
-        return make_response(jsonify({'error': 'eroare la update'}), 500)
+        return make_response(jsonify({'error': 'Eroare la update'}), 500)
 
 @app.route("/api/countries/<int:id>", methods=['DELETE'])
 def delete_country(id):
@@ -134,10 +167,10 @@ def delete_country(id):
         if country:
             db.session.delete(country)
             db.session.commit()
-            return make_response(jsonify({'message': 'Country deleted'}), 200)
-        return make_response(jsonify({'error': 'Country not found'}), 404)
+            return make_response(jsonify({'message': 'Tara a fost stearsa'}), 200)
+        return make_response(jsonify({'error': 'Tara nu a fost gasita'}), 404)
     except:
-        return make_response(jsonify({'error': 'eroare la delete'}), 500)
+        return make_response(jsonify({'error': 'Eroare la delete'}), 500)
 
 @app.route("/api/cities", methods=['POST'])
 def create_city():
@@ -165,7 +198,7 @@ def create_city():
         db.session.commit()
         return make_response(jsonify({'id': new_city.id}), 201)
     except:
-        return make_response(jsonify({'error': 'eroare la crearea tarii'}), 500)
+        return make_response(jsonify({'error': 'Eroare la crearea tarii'}), 500)
 
 @app.route("/api/cities", methods=['GET'])
 def get_cities():
@@ -173,7 +206,7 @@ def get_cities():
         cities = Orase.query.all()
         return make_response(jsonify([city.json() for city in cities]), 200)
     except:
-        return make_response(jsonify({'error': 'eroare la preluarea tarilor'}), 500)
+        return make_response(jsonify({'error': 'Eroare la preluarea tarilor'}), 500)
 
 @app.route("/api/cities/country/<int:id>", methods=['GET'])
 def get_city_by_countryid(id):
@@ -181,7 +214,7 @@ def get_city_by_countryid(id):
         cities = Orase.query.filter_by(idTara=id).all()
         return make_response(jsonify([city.json() for city in cities]), 200)
     except:
-        return make_response(jsonify({'error': 'eroare la preluarea tarilor'}), 500)
+        return make_response(jsonify({'error': 'Eroare la preluarea tarilor'}), 500)
 
 @app.route("/api/cities/<int:id>", methods=['PUT'])
 def update_city(id):
@@ -207,10 +240,10 @@ def update_city(id):
                 if key in payload:
                     setattr(city, key, payload[key])
             db.session.commit()
-            return make_response(jsonify({'message': 'Oras actualizat!'}), 200)
+            return make_response(jsonify({'message': 'Orasul a fost actualizat!'}), 200)
         return make_response(jsonify({'error': 'Orasul nu a fost gasit!'}), 404)
     except:
-        return make_response(jsonify({'error': 'eroare la update'}), 500)
+        return make_response(jsonify({'error': 'Eroare la update'}), 500)
     
 @app.route("/api/cities/<int:id>", methods=['DELETE'])
 def delete_city(id):
@@ -219,10 +252,10 @@ def delete_city(id):
         if city:
             db.session.delete(city)
             db.session.commit()
-            return make_response(jsonify({'message': 'Oras sters!'}), 200)
+            return make_response(jsonify({'message': 'Orasul a fost sters!'}), 200)
         return make_response(jsonify({'error': 'Orasul nu a fost gasit!'}), 404)
     except:
-        return make_response(jsonify({'error': 'eroare la delete'}), 500)
+        return make_response(jsonify({'error': 'Eroare la delete'}), 500)
 
 @app.route("/api/temperatures", methods=['POST'])
 def add_temperature():
@@ -240,13 +273,12 @@ def add_temperature():
         cities = Orase.query.filter_by(id=payload['idOras'])
         if cities.count() == 0:
             return make_response(jsonify({'error': 'Orasul nu exista'}), 404)
-        # I want timestamp to be the exact time when the request is made
         new_temperature = Temperaturi(idOras=payload['idOras'], valoare=payload['valoare'])
         db.session.add(new_temperature)
         db.session.commit()
         return make_response(jsonify({'id': new_temperature.id}), 201)
     except:
-        return make_response(jsonify({'error': 'eroare la crearea temperaturii'}), 500)
+        return make_response(jsonify({'error': 'Eroare la crearea temperaturii'}), 500)
 
 @app.route("/api/temperatures", methods=['GET'])
 def get_temperatures_by_filters():
@@ -260,7 +292,7 @@ def get_temperatures_by_filters():
         temperatures = Temperaturi.query.join(Orase).filter(and_(*filter_list)).all()
         return make_response(jsonify([temperature.json() for temperature in temperatures]), 200)
     except:
-        return make_response(jsonify({'error': 'eroare la preluarea temperaturilor'}), 500)
+        return make_response(jsonify({'error': 'Eroare la preluarea temperaturilor'}), 500)
 
 @app.route("/api/temperatures/cities/<int:id>", methods=['GET'])
 def get_temperature_by_cityid(id):
@@ -275,7 +307,7 @@ def get_temperature_by_cityid(id):
         temperatures = Temperaturi.query.join(Orase).filter(and_(*filter_list)).all()
         return make_response(jsonify([temperature.json() for temperature in temperatures]), 200)
     except:
-        return make_response(jsonify({'error': 'eroare la preluarea temperaturii'}), 500)
+        return make_response(jsonify({'error': 'Eroare la preluarea temperaturii'}), 500)
 
 @app.route("/api/temperatures/countries/<int:id>", methods=['GET'])
 def get_temperature_by_countryid(id):
@@ -290,7 +322,7 @@ def get_temperature_by_countryid(id):
         temperatures = Temperaturi.query.join(Orase).filter(and_(*filter_list)).all()
         return make_response(jsonify([temperature.json() for temperature in temperatures]), 200)
     except:
-        return make_response(jsonify({'error': 'eroare la preluarea temperaturii'}), 500)
+        return make_response(jsonify({'error': 'Eroare la preluarea temperaturii'}), 500)
     
 @app.route("/api/temperatures/<int:id>", methods=['PUT'])
 def update_temperature(id):
@@ -311,10 +343,10 @@ def update_temperature(id):
             temperature.valoare = payload['valoare']
             temperature.idOras = payload['idOras']
             db.session.commit()
-            return make_response(jsonify({'message': 'Temperature updated'}), 200)
-        return make_response(jsonify({'error': 'Temperature not found'}), 404)
+            return make_response(jsonify({'message': 'Temperatura a fost adaugata'}), 200)
+        return make_response(jsonify({'error': 'Temperatura nu a fost gasita'}), 404)
     except:
-        return make_response(jsonify({'error': 'eroare la update'}), 500)
+        return make_response(jsonify({'error': 'Eroare la update'}), 500)
     
 @app.route("/api/temperatures/<int:id>", methods=['DELETE'])
 def delete_temperature(id):
@@ -323,7 +355,7 @@ def delete_temperature(id):
         if temperature:
             db.session.delete(temperature)
             db.session.commit()
-            return make_response(jsonify({'message': 'Temperature deleted'}), 200)
-        return make_response(jsonify({'error': 'Temperature not found'}), 404)
+            return make_response(jsonify({'message': 'Temperatura a fost stearsa'}), 200)
+        return make_response(jsonify({'error': 'Temperatura nu a fost gasita'}), 404)
     except:
-        return make_response(jsonify({'error': 'eroare la delete'}), 500)
+        return make_response(jsonify({'error': 'Eroare la delete'}), 500)
