@@ -9,6 +9,8 @@ services:
       - "6000:6000"
     environment:
       - DB_URL=postgresql://postgres:postgres@weather_db:5432/postgres
+    networks:
+      - weather_network
     depends_on:
       - weather_db
       
@@ -17,6 +19,9 @@ services:
     image: postgres:12
     ports:
       - "5432:5432"
+    networks:
+      - weather_network
+      - pgadmin_network
     environment: 
       - POSTGRES_PASSWORD=postgres
     env_file: global_variables.env
@@ -34,6 +39,14 @@ services:
       - PGADMIN_LISTEN_PORT=80
     depends_on:
       - weather_db
+    networks:
+      - pgadmin_network
+
+networks:
+  weather_network:
+    name: weather_network
+  pgadmin_network:
+    name: pgadmin_network
 
 volumes:
   pgdata: {}

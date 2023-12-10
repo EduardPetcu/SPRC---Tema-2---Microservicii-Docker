@@ -1,10 +1,11 @@
-Petcu Eduard - 344C1
+# Petcu Eduard - 344C1
 
-# Rulare tema + pgadmin
+## Rulare tema + pgadmin
 Tema se ruleaza executand comanda `docker-compose up --build` in directorul
-principal.
+principal. API-ul se afla pe portul 6000, baza de date pe portul 5432 iar
+utilitarul de baze de date pe portul 5050.
 Pentru a vedea tabelele construite prin intermediul utilitarului folosit
-`pgAdmin` [1] se poate intra pe browser la localhost:5050 si login cu 
+`pgAdmin` [1] se poate intra pe browser la `localhost:5050` si login cu 
 credentialele:
 - email: admin@admin.com
 - password: admin
@@ -15,12 +16,12 @@ Mai departe, se adauga un nou server:
 - Password -> postgres
 Dupa aceea, se pot realiza operatii pe tabele din acest utilitar. 
 
-# Alegerea microserviciilor
+## Alegerea microserviciilor
 Am ales sa lucrez in python flask si SQLAlchemy iar un mare impact in alegerea
 acestora l-a avut un tutorial [2] care explica lucrurile de baza despre 
 interactiunea python flask-ului cu bazele de date 
 
-# Referinte
+## Referinte
 [1] : https://github.com/pgadmin-org/pgadmin4
 
 [2] : https://www.youtube.com/watch?v=fHQWTsWqBdE&t
